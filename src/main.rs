@@ -1,12 +1,11 @@
-mod transaction;
 mod resources;
+mod transaction;
 
 use transaction::Transaction;
 
 use std::process;
 use std::sync::mpsc;
 use std::thread;
-
 
 fn main() {
     let (tx, rx) = mpsc::channel::<Transaction>();
