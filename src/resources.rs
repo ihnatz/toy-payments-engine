@@ -3,29 +3,31 @@ use csv::{ReaderBuilder, Trim};
 use std::fs::File;
 use std::sync::mpsc;
 
-use crate::event::Event;
+use crate::StreamEvent;
 
 pub struct CsvResource {
-    sender: mpsc::Sender<Event>,
+    sender: mpsc::Sender<StreamEvent>,
 }
 
 impl CsvResource {
-    pub fn new(sender: mpsc::Sender<Event>) -> Self {
+    pub fn new(sender: mpsc::Sender<StreamEvent>) -> Self {
         CsvResource { sender }
     }
 
     pub fn parse(self, path: &str) -> Result<()> {
-        let file = File::open(&path).with_context(|| format!("Failed to read from {}", path))?;
+        let file = File::open(path).with_context(|| format!("Failed to read from {}", path))?;
         let mut rdr = ReaderBuilder::new().trim(Trim::All).from_reader(file);
         for result in rdr.deserialize() {
             match result {
-                Ok(record) => self.sender.send(record)?,
+                Ok(record) => self.sender.send(StreamEvent::Value(record))?,
                 Err(e) => {
                     eprintln!("Can't parse: {:?}", e);
                     continue;
                 }
             }
         }
+
+        self.sender.send(StreamEvent::EndOfStream)?;
         Ok(())
     }
 }
@@ -33,6 +35,7 @@ impl CsvResource {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::Event;
 
     #[test]
     fn test_successfull_parse() {
@@ -42,13 +45,27 @@ mod tests {
 
         assert!(result.is_ok());
 
-        assert_eq!(rx.recv().unwrap(), Event::deposit(1, 1, 100.0));
-        assert_eq!(rx.recv().unwrap(), Event::withdrawal(1, 2, 20.0));
-        assert_eq!(rx.recv().unwrap(), Event::withdrawal(1, 3, 30.0));
-        assert_eq!(rx.recv().unwrap(), Event::dispute(1, 2));
-        assert_eq!(rx.recv().unwrap(), Event::resolve(1, 2));
-        assert_eq!(rx.recv().unwrap(), Event::dispute(1, 3));
-        assert_eq!(rx.recv().unwrap(), Event::chargeback(1, 3));
+        assert_eq!(
+            rx.recv().unwrap(),
+            StreamEvent::Value(Event::deposit(1, 1, 100.0)),
+        );
+        assert_eq!(
+            rx.recv().unwrap(),
+            StreamEvent::Value(Event::withdrawal(1, 2, 20.0)),
+        );
+        assert_eq!(
+            rx.recv().unwrap(),
+            StreamEvent::Value(Event::withdrawal(1, 3, 30.0)),
+        );
+        assert_eq!(rx.recv().unwrap(), StreamEvent::Value(Event::dispute(1, 2)),);
+        assert_eq!(rx.recv().unwrap(), StreamEvent::Value(Event::resolve(1, 2)),);
+        assert_eq!(rx.recv().unwrap(), StreamEvent::Value(Event::dispute(1, 3)),);
+        assert_eq!(
+            rx.recv().unwrap(),
+            StreamEvent::Value(Event::chargeback(1, 3)),
+        );
+        assert_eq!(rx.recv().unwrap(), StreamEvent::EndOfStream,);
+
         assert!(rx.recv().is_err());
     }
 
@@ -60,8 +77,15 @@ mod tests {
 
         assert!(result.is_ok());
 
-        assert_eq!(rx.recv().unwrap(), Event::deposit(1, 1, 100.0));
-        assert_eq!(rx.recv().unwrap(), Event::withdrawal(1, 2, 20.0));
+        assert_eq!(
+            rx.recv().unwrap(),
+            StreamEvent::Value(Event::deposit(1, 1, 100.0))
+        );
+        assert_eq!(
+            rx.recv().unwrap(),
+            StreamEvent::Value(Event::withdrawal(1, 2, 20.0))
+        );
+        assert_eq!(rx.recv().unwrap(), StreamEvent::EndOfStream,);
         assert!(rx.recv().is_err());
     }
 

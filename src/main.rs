@@ -1,15 +1,22 @@
+mod event;
 mod ledger;
 mod resources;
-mod event;
 
 use event::Event;
+use ledger::Ledger;
 
-use std::process;
 use std::sync::mpsc;
-use std::thread;
+use std::{process, thread};
+
+#[derive(Debug, PartialEq)]
+enum StreamEvent {
+    Value(Event),
+    EndOfStream,
+}
 
 fn main() {
-    let (tx, rx) = mpsc::channel::<Event>();
+    let ledger = Ledger::default();
+    let (tx, rx) = mpsc::channel::<StreamEvent>();
     thread::spawn(move || {
         let resource = resources::CsvResource::new(tx);
 
@@ -19,7 +26,19 @@ fn main() {
         }
     });
 
-    for received in rx {
-        println!("Got: {:?}", received);
+    for event in rx {
+        match event {
+            StreamEvent::Value(event) => {
+                match ledger.add_event(event) {
+                    Ok(_) => (),
+                    Err(message) => eprintln!("{}", message),
+                };
+            }
+            StreamEvent::EndOfStream => {
+                break;
+            }
+        }
     }
+
+    println!("{:?}", ledger.count());
 }
