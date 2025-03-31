@@ -1,14 +1,15 @@
+mod ledger;
 mod resources;
-mod transaction;
+mod event;
 
-use transaction::Transaction;
+use event::Event;
 
 use std::process;
 use std::sync::mpsc;
 use std::thread;
 
 fn main() {
-    let (tx, rx) = mpsc::channel::<Transaction>();
+    let (tx, rx) = mpsc::channel::<Event>();
     thread::spawn(move || {
         let resource = resources::CsvResource::new(tx);
 

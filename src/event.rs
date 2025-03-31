@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub enum TransactionType {
+pub enum EventType {
     Deposit,
     Withdrawal,
     Dispute,
@@ -11,17 +11,17 @@ pub enum TransactionType {
 }
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
-pub struct Transaction {
+pub struct Event {
     #[serde(rename = "type")]
-    pub tx_type: TransactionType,
+    pub tx_type: EventType,
     pub client: u16,
     pub tx: u32,
     pub amount: Option<f64>,
 }
 
-impl Transaction {
-    fn new(tx_type: TransactionType, client: u16, tx: u32, amount: Option<f64>) -> Self {
-        Transaction {
+impl Event {
+    fn new(tx_type: EventType, client: u16, tx: u32, amount: Option<f64>) -> Self {
+        Event {
             tx_type,
             client,
             tx,
@@ -30,22 +30,22 @@ impl Transaction {
     }
 
     pub fn deposit(client: u16, tx: u32, amount: f64) -> Self {
-        Self::new(TransactionType::Deposit, client, tx, Some(amount))
+        Self::new(EventType::Deposit, client, tx, Some(amount))
     }
 
     pub fn withdrawal(client: u16, tx: u32, amount: f64) -> Self {
-        Self::new(TransactionType::Withdrawal, client, tx, Some(amount))
+        Self::new(EventType::Withdrawal, client, tx, Some(amount))
     }
 
     pub fn dispute(client: u16, tx: u32) -> Self {
-        Self::new(TransactionType::Dispute, client, tx, None)
+        Self::new(EventType::Dispute, client, tx, None)
     }
 
     pub fn resolve(client: u16, tx: u32) -> Self {
-        Self::new(TransactionType::Resolve, client, tx, None)
+        Self::new(EventType::Resolve, client, tx, None)
     }
 
     pub fn chargeback(client: u16, tx: u32) -> Self {
-        Self::new(TransactionType::Chargeback, client, tx, None)
+        Self::new(EventType::Chargeback, client, tx, None)
     }
 }

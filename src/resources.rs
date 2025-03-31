@@ -3,14 +3,14 @@ use csv::{ReaderBuilder, Trim};
 use std::fs::File;
 use std::sync::mpsc;
 
-use crate::transaction::Transaction;
+use crate::event::Event;
 
 pub struct CsvResource {
-    sender: mpsc::Sender<Transaction>,
+    sender: mpsc::Sender<Event>,
 }
 
 impl CsvResource {
-    pub fn new(sender: mpsc::Sender<Transaction>) -> Self {
+    pub fn new(sender: mpsc::Sender<Event>) -> Self {
         CsvResource { sender }
     }
 
@@ -42,13 +42,13 @@ mod tests {
 
         assert!(result.is_ok());
 
-        assert_eq!(rx.recv().unwrap(), Transaction::deposit(1, 1, 100.0));
-        assert_eq!(rx.recv().unwrap(), Transaction::withdrawal(1, 2, 20.0));
-        assert_eq!(rx.recv().unwrap(), Transaction::withdrawal(1, 3, 30.0));
-        assert_eq!(rx.recv().unwrap(), Transaction::dispute(1, 2));
-        assert_eq!(rx.recv().unwrap(), Transaction::resolve(1, 2));
-        assert_eq!(rx.recv().unwrap(), Transaction::dispute(1, 3));
-        assert_eq!(rx.recv().unwrap(), Transaction::chargeback(1, 3));
+        assert_eq!(rx.recv().unwrap(), Event::deposit(1, 1, 100.0));
+        assert_eq!(rx.recv().unwrap(), Event::withdrawal(1, 2, 20.0));
+        assert_eq!(rx.recv().unwrap(), Event::withdrawal(1, 3, 30.0));
+        assert_eq!(rx.recv().unwrap(), Event::dispute(1, 2));
+        assert_eq!(rx.recv().unwrap(), Event::resolve(1, 2));
+        assert_eq!(rx.recv().unwrap(), Event::dispute(1, 3));
+        assert_eq!(rx.recv().unwrap(), Event::chargeback(1, 3));
         assert!(rx.recv().is_err());
     }
 
@@ -60,8 +60,8 @@ mod tests {
 
         assert!(result.is_ok());
 
-        assert_eq!(rx.recv().unwrap(), Transaction::deposit(1, 1, 100.0));
-        assert_eq!(rx.recv().unwrap(), Transaction::withdrawal(1, 2, 20.0));
+        assert_eq!(rx.recv().unwrap(), Event::deposit(1, 1, 100.0));
+        assert_eq!(rx.recv().unwrap(), Event::withdrawal(1, 2, 20.0));
         assert!(rx.recv().is_err());
     }
 
