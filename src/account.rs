@@ -1,5 +1,7 @@
 use rust_decimal::dec;
 use rust_decimal::Decimal;
+use serde::ser::SerializeStruct;
+use serde::ser::{Serialize, Serializer};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Account {
@@ -7,6 +9,23 @@ pub struct Account {
     available: Decimal,
     held: Decimal,
     locked: bool,
+}
+
+impl Serialize for Account {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("Account", 5)?;
+
+        state.serialize_field("client", &self.id)?;
+        state.serialize_field("available", &self.available.to_string())?;
+        state.serialize_field("held", &self.held.to_string())?;
+        state.serialize_field("total", &self.total().to_string())?;
+        state.serialize_field("locked", &self.locked.to_string())?;
+
+        state.end()
+    }
 }
 
 impl Account {
@@ -47,14 +66,6 @@ impl Account {
 
     pub fn total(&self) -> Decimal {
         self.held + self.available
-    }
-
-    pub fn held(&self) -> Decimal {
-        self.held
-    }
-
-    pub fn locked(&self) -> bool {
-        self.locked
     }
 
     fn lock(&mut self) {
