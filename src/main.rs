@@ -12,7 +12,7 @@ use event::Event;
 use std::process;
 use std::sync::mpsc;
 
-const QUEUE_CAPACITY: usize = 1;
+const QUEUE_CAPACITY: usize = 100;
 const WORKERS_COUNT: usize = 4;
 
 #[derive(Debug, PartialEq)]

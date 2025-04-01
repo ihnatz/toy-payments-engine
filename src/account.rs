@@ -3,11 +3,10 @@ use rust_decimal::Decimal;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Account {
-    pub id: u16,
-    pub available: Decimal,
-    pub held: Decimal,
-    pub total: Decimal,
-    pub locked: bool,
+    id: u16,
+    available: Decimal,
+    held: Decimal,
+    locked: bool,
 }
 
 impl Account {
@@ -16,8 +15,49 @@ impl Account {
             id,
             available: dec!(0.0),
             held: dec!(0.0),
-            total: dec!(0.0),
             locked: false,
         }
+    }
+
+    pub fn hold(&mut self, amount: Decimal) {
+        self.held += amount;
+    }
+
+    pub fn resolve(&mut self, amount: Decimal) {
+        self.held -= amount;
+        self.available += amount;
+    }
+
+    pub fn reject(&mut self, amount: Decimal) {
+        self.held -= amount;
+        self.lock();
+    }
+
+    pub fn deposit(&mut self, amount: Decimal) {
+        self.available += amount
+    }
+
+    pub fn withdraw(&mut self, amount: Decimal) {
+        self.available -= amount
+    }
+
+    pub fn available(&self) -> Decimal {
+        self.available
+    }
+
+    pub fn total(&self) -> Decimal {
+        self.held + self.available
+    }
+
+    pub fn held(&self) -> Decimal {
+        self.held
+    }
+
+    pub fn locked(&self) -> bool {
+        self.locked
+    }
+
+    fn lock(&mut self) {
+        self.locked = true;
     }
 }

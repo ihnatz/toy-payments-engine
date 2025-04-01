@@ -9,10 +9,17 @@ pub enum Transaction {
     Withdrawal { amount: Decimal, client: u16 },
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum DisputeEvent {
+    Dispute,
+    Chargeback,
+    Resolve,
+}
+
 #[derive(Default, Debug, Clone)]
 pub struct Ledger {
     transactions: Arc<DashMap<u32, Transaction>>,
-    disputes: Arc<DashMap<u32, Vec<Event>>>,
+    disputes: Arc<DashMap<u32, Vec<DisputeEvent>>>,
 }
 
 impl Ledger {
@@ -40,12 +47,36 @@ impl Ledger {
                 }
             },
             EventType::Chargeback | EventType::Dispute | EventType::Resolve => {
+                if self.fetch_transaction(id, client).is_none() {
+                    return Err(format!(
+                        "Can't find a transaction with ID {} for client {}",
+                        id, client
+                    ));
+                }
+
+                let dispute_event = match event.tx_type {
+                    EventType::Dispute => DisputeEvent::Dispute,
+                    EventType::Chargeback => DisputeEvent::Chargeback,
+                    EventType::Resolve => DisputeEvent::Resolve,
+                    _ => return Err(format!("Unknown dispute format: {:?}", event.tx_type)),
+                };
+
+                let previous_event = self
+                    .disputes
+                    .get(&id)
+                    .and_then(|f| f.clone().into_iter().last());
+
+                if !self.is_valid_dispute_transition(previous_event.clone(), dispute_event.clone())
+                {
+                    return Err(String::from("Undefined transition"));
+                }
+
                 self.disputes
                     .entry(id)
                     .and_modify(|v| {
-                        v.push(event.clone());
+                        v.push(dispute_event.clone());
                     })
-                    .or_insert_with(|| vec![event]);
+                    .or_insert_with(|| vec![dispute_event.clone()]);
                 Ok(())
             }
         }
@@ -69,6 +100,22 @@ impl Ledger {
                 }
             }
         })
+    }
+
+    fn is_valid_dispute_transition(
+        &self,
+        previous: Option<DisputeEvent>,
+        next: DisputeEvent,
+    ) -> bool {
+        match (previous, next) {
+            (Some(DisputeEvent::Dispute), DisputeEvent::Chargeback | DisputeEvent::Resolve) => true,
+            (
+                Some(DisputeEvent::Chargeback) | Some(DisputeEvent::Resolve),
+                DisputeEvent::Dispute,
+            ) => true,
+            (None, DisputeEvent::Dispute) => true,
+            (_, _) => false,
+        }
     }
 }
 
@@ -163,7 +210,7 @@ mod tests {
         assert_eq!(disputes, 1);
 
         let disputes_vec = ledger.disputes.get(&1).unwrap();
-        assert_eq!(disputes_vec.value(), &vec![dispute]);
+        assert_eq!(disputes_vec.value(), &vec![DisputeEvent::Dispute]);
     }
 
     #[test]
@@ -191,10 +238,22 @@ mod tests {
 
         assert!(ledger.add_event(deposit).is_ok());
         assert!(ledger.add_event(dispute1.clone()).is_ok());
-        assert!(ledger.add_event(dispute2.clone()).is_ok());
+        assert!(ledger.add_event(dispute2.clone()).is_err()); // Dispute can't go to Dispute
 
         let disputes_vec = ledger.disputes.get(&1).unwrap();
-        assert_eq!(disputes_vec.value(), &vec![dispute1, dispute2]);
+        assert_eq!(disputes_vec.value(), &vec![DisputeEvent::Dispute]);
+    }
+
+    #[test]
+    fn test_straight_to_resolve() {
+        let ledger = Ledger::default();
+        let deposit = Event::deposit(1, 1, 10.0);
+        let resolve = Event::resolve(1, 1);
+
+        assert!(ledger.add_event(deposit).is_ok());
+        assert!(ledger.add_event(resolve).is_err()); // Dispute can't go to Dispute
+
+        assert!(ledger.disputes.get(&1).is_none());
     }
 
     #[test]
@@ -207,13 +266,12 @@ mod tests {
 
         assert!(ledger.add_event(deposit).is_ok());
         assert!(ledger.add_event(dispute).is_ok());
-        assert!(ledger.add_event(resolve.clone()).is_ok());
-        assert!(ledger.add_event(chargeback.clone()).is_ok());
+        assert!(ledger.add_event(resolve).is_ok());
+        assert!(ledger.add_event(chargeback).is_err());
 
         let disputes_vec = ledger.disputes.get(&1).unwrap();
-        assert_eq!(disputes_vec.value().len(), 3);
-        assert_eq!(disputes_vec.value()[1], resolve);
-        assert_eq!(disputes_vec.value()[2], chargeback);
+        assert_eq!(disputes_vec.value().len(), 2);
+        assert_eq!(disputes_vec.value()[1], DisputeEvent::Resolve);
     }
 
     #[test]
@@ -221,11 +279,11 @@ mod tests {
         let ledger = Ledger::default();
         let dispute = Event::dispute(1, 1);
 
-        assert!(ledger.add_event(dispute).is_ok());
+        assert!(ledger.add_event(dispute).is_err());
 
         let (transactions, disputes) = ledger.count();
         assert_eq!(transactions, 0);
-        assert_eq!(disputes, 1);
+        assert_eq!(disputes, 0);
     }
 
     #[test]

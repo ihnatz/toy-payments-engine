@@ -12,7 +12,7 @@ use dashmap::DashMap;
 
 use crate::{account::Account, event::Event, ledger::Ledger, worker::Worker, WORKERS_COUNT};
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct EngineCore {
     pub ledger: Ledger,
     pub chart: Arc<DashMap<u16, Account>>,
