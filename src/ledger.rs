@@ -20,7 +20,7 @@ impl Ledger {
                     Err(format!("Transaction with ID {} already exists", id))
                 }
                 dashmap::mapref::entry::Entry::Vacant(entry) => {
-                    entry.insert(event);
+                    entry.insert(event.clone());
                     Ok(())
                 }
             },
@@ -34,6 +34,13 @@ impl Ledger {
                 Ok(())
             }
         }
+    }
+
+    pub fn fetch_transaction(&self, id: u32, client: u16) -> Option<Event> {
+        self.transactions
+            .get(&id)
+            .filter(|event| event.client == client)
+            .map(|event| event.clone())
     }
 
     pub fn count(&self) -> (usize, usize) {
@@ -109,6 +116,22 @@ mod tests {
 
         let disputes_vec = ledger.disputes.get(&1).unwrap();
         assert_eq!(disputes_vec.value(), &vec![dispute]);
+    }
+
+    #[test]
+    fn test_fetch_transaction() {
+        let ledger = Ledger::default();
+        let deposit1 = Event::deposit(1, 1, 10.0);
+        let deposit2 = Event::deposit(2, 2, 20.0);
+
+        assert!(ledger.add_event(deposit1).is_ok());
+        assert!(ledger.fetch_transaction(1, 1).is_some());
+        assert!(ledger.fetch_transaction(1, 2).is_none());
+        assert!(ledger.fetch_transaction(2, 1).is_none());
+
+        assert!(ledger.add_event(deposit2).is_ok());
+        assert!(ledger.fetch_transaction(2, 2).is_some());
+        assert!(ledger.fetch_transaction(2, 1).is_none());
     }
 
     #[test]
