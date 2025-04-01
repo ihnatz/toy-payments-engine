@@ -4,7 +4,7 @@ use dashmap::DashMap;
 
 use crate::event::{Event, EventType};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Ledger {
     transactions: Arc<DashMap<u32, Event>>,
     disputes: Arc<DashMap<u32, Vec<Event>>>,
@@ -43,6 +43,7 @@ impl Ledger {
             .map(|event| event.clone())
     }
 
+    #[allow(dead_code)]
     pub fn count(&self) -> (usize, usize) {
         (self.transactions.len(), self.disputes.len())
     }

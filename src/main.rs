@@ -1,12 +1,18 @@
+mod account;
+mod engine;
 mod event;
 mod ledger;
 mod resources;
+mod worker;
 
+use engine::Engine;
 use event::Event;
-use ledger::Ledger;
 
+use std::process;
 use std::sync::mpsc;
-use std::{process, thread};
+
+const QUEUE_CAPACITY: usize = 1;
+const WORKERS_COUNT: usize = 4;
 
 #[derive(Debug, PartialEq)]
 enum StreamEvent {
@@ -15,30 +21,30 @@ enum StreamEvent {
 }
 
 fn main() {
-    let ledger = Ledger::default();
     let (tx, rx) = mpsc::channel::<StreamEvent>();
-    thread::spawn(move || {
-        let resource = resources::CsvResource::new(tx);
 
-        if let Err(e) = resource.parse("fixtures/sample.csv") {
-            eprintln!("Error {:?}", e);
-            process::exit(1);
-        }
-    });
+    let mut engine = Engine::new();
+    let handles = engine.start_workers();
+
+    if let Err(e) = resources::CsvResource::new(tx).parse("fixtures/many_clients.csv") {
+        eprintln!("Error {:?}", e);
+        process::exit(1);
+    }
 
     for event in rx {
         match event {
+            StreamEvent::EndOfStream => break,
             StreamEvent::Value(event) => {
-                match ledger.add_event(event) {
-                    Ok(_) => (),
-                    Err(message) => eprintln!("{}", message),
-                };
-            }
-            StreamEvent::EndOfStream => {
-                break;
+                let _ = engine.submit_event(event.clone());
             }
         }
     }
 
-    println!("{:?}", ledger.count());
+    engine.shutdown();
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("{:?}", engine.core.chart);
 }
