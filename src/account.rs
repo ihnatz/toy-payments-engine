@@ -7,10 +7,10 @@ pub struct Account {
     pub locked: bool,
 }
 
-impl Default for Account {
-    fn default() -> Self {
+impl Account {
+    pub fn new(id: u16) -> Self {
         Account {
-            id: 0,
+            id,
             available: 0.0,
             held: 0.0,
             total: 0.0,

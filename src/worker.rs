@@ -42,10 +42,7 @@ impl Worker {
             .engine_core
             .chart
             .entry(event.client)
-            .or_insert_with(|| Account {
-                id: event.client,
-                ..Default::default()
-            });
+            .or_insert_with(|| Account::new(event.client));
 
         match event.tx_type {
             EventType::Deposit => client.available += event.amount.unwrap(),
