@@ -1,3 +1,5 @@
+use rust_decimal::Decimal;
+
 use crate::{
     account::Account,
     engine::EngineCore,
@@ -32,14 +34,18 @@ impl EventProcessor {
 
     fn handle_deposit(&self, event: &Event) {
         self.with_account(event.client, |account| {
-            account.available += event.amount.unwrap();
+            if let Some(amount) = self.get_transaction_amount(event) {
+                account.available += amount;
+            }
         });
     }
 
     fn handle_withdrawal(&self, event: &Event) {
         self.with_account(event.client, |account| {
-            if account.available >= event.amount.unwrap() {
-                account.available -= event.amount.unwrap();
+            if let Some(amount) = self.get_transaction_amount(event) {
+                if account.available >= amount {
+                    account.available -= amount;
+                }
             }
         });
     }
@@ -82,7 +88,7 @@ impl EventProcessor {
         action(&mut account);
     }
 
-    fn get_transaction_amount(&self, event: &Event) -> Option<f64> {
+    fn get_transaction_amount(&self, event: &Event) -> Option<Decimal> {
         let tx = self
             .engine_core
             .ledger

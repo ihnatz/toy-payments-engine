@@ -1,11 +1,12 @@
 use crate::event::{Event, EventType};
 use dashmap::DashMap;
+use rust_decimal::{prelude::FromPrimitive, Decimal};
 use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Transaction {
-    Deposit { amount: f64, client: u16 },
-    Withdrawal { amount: f64, client: u16 },
+    Deposit { amount: Decimal, client: u16 },
+    Withdrawal { amount: Decimal, client: u16 },
 }
 
 #[derive(Default, Debug, Clone)]
@@ -25,7 +26,7 @@ impl Ledger {
                     Err(format!("Transaction with ID {} already exists", id))
                 }
                 dashmap::mapref::entry::Entry::Vacant(entry) => {
-                    if let Some(amount) = event.amount {
+                    if let Some(amount) = event.amount.and_then(Decimal::from_f64) {
                         let transaction = match event.tx_type {
                             EventType::Deposit => Transaction::Deposit { amount, client },
                             EventType::Withdrawal => Transaction::Withdrawal { amount, client },
@@ -73,6 +74,8 @@ impl Ledger {
 
 #[cfg(test)]
 mod tests {
+    use rust_decimal::dec;
+
     use super::*;
 
     impl Ledger {
@@ -82,11 +85,11 @@ mod tests {
     }
 
     impl Transaction {
-        pub fn deposit(amount: f64, client: u16) -> Self {
+        pub fn deposit(amount: Decimal, client: u16) -> Self {
             Transaction::Deposit { amount, client }
         }
 
-        pub fn withdrawal(amount: f64, client: u16) -> Self {
+        pub fn withdrawal(amount: Decimal, client: u16) -> Self {
             Transaction::Withdrawal { amount, client }
         }
     }
@@ -112,7 +115,7 @@ mod tests {
 
         assert_eq!(
             ledger.transactions.get(&1).unwrap().value(),
-            &Transaction::deposit(10.0, 1)
+            &Transaction::deposit(dec!(10.0), 1)
         );
     }
 
@@ -129,7 +132,7 @@ mod tests {
 
         assert_eq!(
             ledger.transactions.get(&1).unwrap().value(),
-            &Transaction::withdrawal(10.0, 1)
+            &Transaction::withdrawal(dec!(10.0), 1)
         );
     }
 
