@@ -2,6 +2,7 @@ mod account;
 mod engine;
 mod event;
 mod ledger;
+mod processor;
 mod resources;
 mod worker;
 
