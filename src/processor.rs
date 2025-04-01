@@ -2,6 +2,7 @@ use crate::{
     account::Account,
     engine::EngineCore,
     event::{Event, EventType},
+    ledger::Transaction,
 };
 
 pub struct EventProcessor {
@@ -82,9 +83,15 @@ impl EventProcessor {
     }
 
     fn get_transaction_amount(&self, event: &Event) -> Option<f64> {
-        self.engine_core
+        let tx = self
+            .engine_core
             .ledger
-            .fetch_transaction(event.tx, event.client)
-            .and_then(|tx| tx.amount)
+            .fetch_transaction(event.tx, event.client);
+
+        match tx {
+            Some(Transaction::Deposit { amount, .. })
+            | Some(Transaction::Withdrawal { amount, .. }) => Some(amount),
+            None => None,
+        }
     }
 }

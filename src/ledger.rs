@@ -1,18 +1,23 @@
+use crate::event::{Event, EventType};
+use dashmap::DashMap;
 use std::sync::Arc;
 
-use dashmap::DashMap;
-
-use crate::event::{Event, EventType};
+#[derive(Debug, Clone, PartialEq)]
+pub enum Transaction {
+    Deposit { amount: f64, client: u16 },
+    Withdrawal { amount: f64, client: u16 },
+}
 
 #[derive(Default, Debug, Clone)]
 pub struct Ledger {
-    transactions: Arc<DashMap<u32, Event>>,
+    transactions: Arc<DashMap<u32, Transaction>>,
     disputes: Arc<DashMap<u32, Vec<Event>>>,
 }
 
 impl Ledger {
     pub fn add_event(&self, event: Event) -> Result<(), String> {
         let id = event.tx;
+        let client = event.client;
 
         match event.tx_type {
             EventType::Deposit | EventType::Withdrawal => match self.transactions.entry(id) {
@@ -20,8 +25,17 @@ impl Ledger {
                     Err(format!("Transaction with ID {} already exists", id))
                 }
                 dashmap::mapref::entry::Entry::Vacant(entry) => {
-                    entry.insert(event.clone());
-                    Ok(())
+                    if let Some(amount) = event.amount {
+                        let transaction = match event.tx_type {
+                            EventType::Deposit => Transaction::Deposit { amount, client },
+                            EventType::Withdrawal => Transaction::Withdrawal { amount, client },
+                            _ => return Err(format!("Unknown transaction format for ID {}", id)),
+                        };
+                        entry.insert(transaction);
+                        Ok(())
+                    } else {
+                        Err(format!("No amount for a transaction with ID {}", id))
+                    }
                 }
             },
             EventType::Chargeback | EventType::Dispute | EventType::Resolve => {
@@ -36,22 +50,46 @@ impl Ledger {
         }
     }
 
-    pub fn fetch_transaction(&self, id: u32, client: u16) -> Option<Event> {
-        self.transactions
-            .get(&id)
-            .filter(|event| event.client == client)
-            .map(|event| event.clone())
-    }
-
-    #[allow(dead_code)]
-    pub fn count(&self) -> (usize, usize) {
-        (self.transactions.len(), self.disputes.len())
+    pub fn fetch_transaction(&self, id: u32, client: u16) -> Option<Transaction> {
+        self.transactions.get(&id).and_then(|tx| {
+            let transaction = tx.value();
+            match transaction {
+                Transaction::Deposit {
+                    client: tx_client, ..
+                }
+                | Transaction::Withdrawal {
+                    client: tx_client, ..
+                } => {
+                    if *tx_client == client {
+                        Some(transaction.clone())
+                    } else {
+                        None
+                    }
+                }
+            }
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    impl Ledger {
+        pub fn count(&self) -> (usize, usize) {
+            (self.transactions.len(), self.disputes.len())
+        }
+    }
+
+    impl Transaction {
+        pub fn deposit(amount: f64, client: u16) -> Self {
+            Transaction::Deposit { amount, client }
+        }
+
+        pub fn withdrawal(amount: f64, client: u16) -> Self {
+            Transaction::Withdrawal { amount, client }
+        }
+    }
 
     #[test]
     fn test_initial_state() {
@@ -72,7 +110,10 @@ mod tests {
         assert_eq!(transactions, 1);
         assert_eq!(disputes, 0);
 
-        assert_eq!(ledger.transactions.get(&1).unwrap().value(), &event);
+        assert_eq!(
+            ledger.transactions.get(&1).unwrap().value(),
+            &Transaction::deposit(10.0, 1)
+        );
     }
 
     #[test]
@@ -86,7 +127,10 @@ mod tests {
         assert_eq!(transactions, 1);
         assert_eq!(disputes, 0);
 
-        assert_eq!(ledger.transactions.get(&1).unwrap().value(), &event);
+        assert_eq!(
+            ledger.transactions.get(&1).unwrap().value(),
+            &Transaction::withdrawal(10.0, 1)
+        );
     }
 
     #[test]
