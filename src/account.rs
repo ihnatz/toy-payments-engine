@@ -20,7 +20,7 @@ impl Serialize for Account {
 
         state.serialize_field("client", &self.id)?;
         state.serialize_field("available", &self.available.to_string())?;
-        state.serialize_field("held", &self.held.to_string())?;
+        state.serialize_field("held", &self.held().to_string())?;
         state.serialize_field("total", &self.total().to_string())?;
         state.serialize_field("locked", &self.locked.to_string())?;
 
@@ -36,6 +36,10 @@ impl Account {
             held: dec!(0.0),
             locked: false,
         }
+    }
+
+    pub fn held(&self) -> Decimal {
+        self.held
     }
 
     pub fn hold(&mut self, amount: Decimal) {
@@ -68,7 +72,11 @@ impl Account {
         self.held + self.available
     }
 
-    fn lock(&mut self) {
+    pub fn lock(&mut self) {
         self.locked = true;
+    }
+
+    pub fn locked(&self) -> bool {
+        self.locked
     }
 }

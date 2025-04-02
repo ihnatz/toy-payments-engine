@@ -109,10 +109,6 @@ impl Ledger {
     ) -> bool {
         match (previous, next) {
             (Some(DisputeEvent::Dispute), DisputeEvent::Chargeback | DisputeEvent::Resolve) => true,
-            (
-                Some(DisputeEvent::Chargeback) | Some(DisputeEvent::Resolve),
-                DisputeEvent::Dispute,
-            ) => true,
             (None, DisputeEvent::Dispute) => true,
             (_, _) => false,
         }

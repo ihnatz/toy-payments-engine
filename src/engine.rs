@@ -46,16 +46,19 @@ impl Engine {
         workers.into_iter().map(|worker| worker.start()).collect()
     }
 
-    pub fn submit_event(&self, event: Event) -> Result<(), &str> {
+    pub fn submit_event(&self, event: Event) -> Result<(), String> {
         match self.core.ledger.add_event(event.clone()) {
-            Ok(_) => (),
-            Err(message) => eprintln!("{}", message),
+            Ok(_) => {
+                let worker_idx = (event.client as usize) % self.queues.len();
+                return self.queues[worker_idx]
+                    .push(event)
+                    .map_err(|_| String::from("Queue is full"));
+            }
+            Err(message) => {
+                eprintln!("{}", message);
+                return Err(message.to_string());
+            }
         };
-
-        let worker_idx = (event.client as usize) % self.queues.len();
-        self.queues[worker_idx]
-            .push(event)
-            .map_err(|_| "Queue is full")
     }
 
     pub fn shutdown(&self) {

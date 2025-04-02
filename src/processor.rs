@@ -43,7 +43,7 @@ impl EventProcessor {
     fn handle_withdrawal(&self, event: &Event) {
         self.with_account(event.client, |account| {
             if let Some(amount) = self.get_transaction_amount(event) {
-                if account.available() >= amount {
+                if !account.locked() && account.available() >= amount {
                     account.withdraw(amount);
                 }
             }
@@ -346,6 +346,50 @@ mod tests {
                 client: 1,
                 tx: 2,
                 amount: None,
+            },
+        ];
+
+        process_events(engine_core.clone(), events);
+
+        assert_eq!(engine_core.chart.get(&1).unwrap().available(), dec!(10.0));
+        assert_eq!(engine_core.chart.get(&1).unwrap().held(), dec!(0.0));
+        assert_eq!(engine_core.chart.get(&1).unwrap().total(), dec!(10.0));
+        assert!(engine_core.chart.get(&1).unwrap().locked());
+    }
+
+    #[test]
+    fn test_dispute_on_withdrawal_with_chargeback_disables_withdrawal() {
+        let engine_core = EngineCore::default();
+        let events = vec![
+            Event {
+                tx_type: EventType::Deposit,
+                client: 1,
+                tx: 1,
+                amount: Some(30.0),
+            },
+            Event {
+                tx_type: EventType::Withdrawal,
+                client: 1,
+                tx: 2,
+                amount: Some(20.0),
+            },
+            Event {
+                tx_type: EventType::Dispute,
+                client: 1,
+                tx: 2,
+                amount: None,
+            },
+            Event {
+                tx_type: EventType::Chargeback,
+                client: 1,
+                tx: 2,
+                amount: None,
+            },
+            Event {
+                tx_type: EventType::Withdrawal,
+                client: 1,
+                tx: 3,
+                amount: Some(10.0),
             },
         ];
 
