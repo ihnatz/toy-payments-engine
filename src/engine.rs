@@ -50,15 +50,15 @@ impl Engine {
         match self.core.ledger.add_event(event.clone()) {
             Ok(_) => {
                 let worker_idx = (event.client as usize) % self.queues.len();
-                return self.queues[worker_idx]
+                self.queues[worker_idx]
                     .push(event)
-                    .map_err(|_| String::from("Queue is full"));
+                    .map_err(|_| String::from("Queue is full"))
             }
             Err(message) => {
                 eprintln!("{}", message);
-                return Err(message.to_string());
+                Err(message.to_string())
             }
-        };
+        }
     }
 
     pub fn shutdown(&self) {
