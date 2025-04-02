@@ -106,6 +106,7 @@ impl EventProcessor {
             .fetch_transaction(event.tx, event.client);
 
         match tx {
+            Some(Transaction::Deposit { amount, .. }) => Some(-amount),
             Some(Transaction::Withdrawal { amount, .. }) => Some(amount),
             _ => None,
         }
@@ -223,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dispute_on_deposit_is_ignored() {
+    fn test_dispute_on_deposit_is_not_ignored() {
         let engine_core = EngineCore::default();
         let events = vec![
             Event {
@@ -248,7 +249,113 @@ mod tests {
 
         process_events(engine_core.clone(), events);
 
+        assert_eq!(engine_core.chart.get(&1).unwrap().available(), dec!(-20.0));
+    }
+
+    #[test]
+    fn test_dispute_on_deposit_with_resolve() {
+        let engine_core = EngineCore::default();
+        let events = vec![
+            Event {
+                tx_type: EventType::Deposit,
+                client: 1,
+                tx: 1,
+                amount: Some(30.0),
+            },
+            Event {
+                tx_type: EventType::Withdrawal,
+                client: 1,
+                tx: 2,
+                amount: Some(20.0),
+            },
+            Event {
+                tx_type: EventType::Dispute,
+                client: 1,
+                tx: 1,
+                amount: None,
+            },
+            Event {
+                tx_type: EventType::Resolve,
+                client: 1,
+                tx: 1,
+                amount: None,
+            },
+        ];
+
+        process_events(engine_core.clone(), events);
+
+        assert_eq!(engine_core.chart.get(&1).unwrap().available(), dec!(-20.0));
+    }
+
+    #[test]
+    fn test_dispute_on_deposit_with_chargeback() {
+        let engine_core = EngineCore::default();
+        let events = vec![
+            Event {
+                tx_type: EventType::Deposit,
+                client: 1,
+                tx: 1,
+                amount: Some(30.0),
+            },
+            Event {
+                tx_type: EventType::Withdrawal,
+                client: 1,
+                tx: 2,
+                amount: Some(20.0),
+            },
+            Event {
+                tx_type: EventType::Dispute,
+                client: 1,
+                tx: 1,
+                amount: None,
+            },
+            Event {
+                tx_type: EventType::Chargeback,
+                client: 1,
+                tx: 1,
+                amount: None,
+            },
+        ];
+
+        process_events(engine_core.clone(), events);
+
         assert_eq!(engine_core.chart.get(&1).unwrap().available(), dec!(10.0));
+        assert!(engine_core.chart.get(&1).unwrap().locked());
+    }
+
+    #[test]
+    fn test_get_money_from_negative_balance() {
+        let engine_core = EngineCore::default();
+        let events = vec![
+            Event {
+                tx_type: EventType::Deposit,
+                client: 1,
+                tx: 1,
+                amount: Some(30.0),
+            },
+            Event {
+                tx_type: EventType::Withdrawal,
+                client: 1,
+                tx: 2,
+                amount: Some(20.0),
+            },
+            Event {
+                tx_type: EventType::Dispute,
+                client: 1,
+                tx: 1,
+                amount: None,
+            },
+            Event {
+                tx_type: EventType::Withdrawal,
+                client: 1,
+                tx: 3,
+                amount: Some(20.0),
+            },
+        ];
+
+        process_events(engine_core.clone(), events);
+
+        assert_eq!(engine_core.chart.get(&1).unwrap().available(), dec!(-20.0));
     }
 
     #[test]

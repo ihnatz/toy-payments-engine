@@ -43,16 +43,30 @@ impl Account {
     }
 
     pub fn hold(&mut self, amount: Decimal) {
-        self.held += amount;
+        if amount < dec!(0) {
+            self.held += amount * dec!(-1);
+            self.available += amount;
+        } else {
+            self.held += amount;
+        }
     }
 
     pub fn resolve(&mut self, amount: Decimal) {
-        self.held -= amount;
-        self.available += amount;
+        if amount < dec!(0) {
+            self.held -= amount * dec!(-1);
+        } else {
+            self.held -= amount;
+            self.available += amount;
+        }
     }
 
     pub fn reject(&mut self, amount: Decimal) {
-        self.held -= amount;
+        if amount < dec!(0) {
+            self.held -= amount * dec!(-1);
+            self.available += amount * dec!(-1);
+        } else {
+            self.held -= amount;
+        }
         self.lock();
     }
 

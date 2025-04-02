@@ -44,3 +44,20 @@ withdrawal, 8, 16, 10.0
 deposit, 9, 17, 100.0
 withdrawal, 9, 18, 90.0
 chargeback,9,18,
+
+deposit, 10, 19, 100
+dispute, 10, 19,
+
+deposit, 11, 20, 100
+dispute, 11, 20,
+resolve, 11, 20,
+
+deposit, 12, 21, 100
+dispute, 12, 21,
+chargeback, 12, 21,
+
+deposit, 13, 22, 100.1234
+deposit, 13, 23, 100.4321
+
+deposit, 14, 24, 0.0001
+deposit, 14, 25, 0.0002
