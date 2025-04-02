@@ -1,6 +1,6 @@
 use crate::event::{Event, EventType};
 use dashmap::DashMap;
-use rust_decimal::{prelude::FromPrimitive, Decimal};
+use rust_decimal::{dec, prelude::FromPrimitive, Decimal};
 use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,6 +34,9 @@ impl Ledger {
                 }
                 dashmap::mapref::entry::Entry::Vacant(entry) => {
                     if let Some(amount) = event.amount.and_then(Decimal::from_f64) {
+                        if amount <= dec!(0) {
+                            return Err(format!("Negative amount for ID {}", id));
+                        }
                         let transaction = match event.tx_type {
                             EventType::Deposit => Transaction::Deposit { amount, client },
                             EventType::Withdrawal => Transaction::Withdrawal { amount, client },
@@ -177,6 +180,14 @@ mod tests {
             ledger.transactions.get(&1).unwrap().value(),
             &Transaction::withdrawal(dec!(10.0), 1)
         );
+    }
+
+    #[test]
+    fn test_add_negative_withdrawal() {
+        let ledger = Ledger::default();
+        let event = Event::withdrawal(1, 1, -10.0);
+
+        assert!(ledger.add_event(event.clone()).is_err());
     }
 
     #[test]
